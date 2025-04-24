@@ -5,6 +5,7 @@ entrypoint = "src/lib.typ"
 authors = ["Bowen Tan"]
 license = "MIT"
 description = "The unofficial thesis template for City University of Hong Kong"
+repository = "https://github.com/bowentan/unofficial-cityuhk-thesis"
 categories = ["thesis"]
 
 [template]
