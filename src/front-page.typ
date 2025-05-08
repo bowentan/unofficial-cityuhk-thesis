@@ -73,7 +73,7 @@
   set text(font: "Times New Roman", size: 12pt)
   set par(leading: 0.8em, justify: true, first-line-indent: 1.5em, spacing: 1em)
   v(7em)
-  align(center)[ #heading[Abstract] ]
+  align(center)[#heading[Abstract]]
   v(3em)
 
   body
@@ -173,7 +173,7 @@
   set text(font: "Times New Roman", size: 12pt)
   set par(leading: 0.8em, justify: true, first-line-indent: 1.5em, spacing: 1em)
   v(7em)
-  align(center)[ #heading[Acknowledgements] ]
+  align(center)[#heading[Acknowledgements]]
   v(3em)
 
   body
@@ -182,85 +182,95 @@
 
 #let make-toc() = {
   set par(leading: 0.8em)
-  show outline.entry: it => link(
-    it.element.location(),
-    {
-      // it.fields()
-      let head = it.element
-      let number = if head.numbering != none {
-        if head.func() == heading {
-          numbering(head.numbering, ..counter(heading).at(head.location()))
+  show outline.entry: it => {
+    // it.fields()
+    let head = it.element
+    // Skip heading with level > 3
+    if head.level > 3 {
+      return
+    }
+    let number = if head.numbering != none {
+      numbering(head.numbering, ..counter(heading).at(head.location()))
+    }
+    // ensure the fill doesn't occupy the full page width, just the available space (1fr)
+    let fill = box(width: 1fr, it.fill)
+    let indent = if it.level == 1 {
+      0em
+    } else {
+      range(1, 2 * (it.level - 1), step: 2).sum() * 0.4em + (it.level - 1) * 1em
+    }
+    let body = if head.func() == heading and head.offset == 1 and head.level == 1 {
+      // Skip the hidden level 1 heading
+      none
+    } else if head.body.func() == box {
+      // Skip self
+      if head.body.body.has("child") {
+        if head.body.body.child == [Table of contents] {
+          return
         } else {
-          numbering(head.numbering, ..counter(figure.where(kind: "chapter")).at(head.location()))
+          head.body.body.child
         }
-      }
-      let fill = box(
-        width: 1fr,
-        it.fill,
-      ) // ensure the fill doesn't occupy the full page width, just the available space (1fr)
-      // let indent = if it.level == 1 {
-      //   0em
-      // } else if it.level == 2 {
-      //   1.4em
-      // } else if it.level == 3 {
-      //   3.8em
-      // }
-      let indent = if it.level == 1 {
-        0em
       } else {
-        range(1, 2 * (it.level - 1), step: 2).sum() * 0.4em + (it.level - 1) * 1em
+        head.body.body
       }
-      [#h(indent) #number #h(1em, weak: true) #head.body #fill #it.page()\ ]
-    },
-  )
+    } else {
+      head.body
+    }
+
+    link(
+      it.element.location(),
+      box[#h(indent) #number #h(1em, weak: true) #body #fill #it.page()],
+    )
+  }
 
   show outline.entry.where(level: 1): set outline.entry(fill: none)
-  show outline.entry.where(level: 1): it => [
+  show outline.entry.where(level: 1): it => box[
     #v(0.6em)
     *#it*
   ]
-  show outline.entry.where(level: 2): it => [
-    // #v(0.1em)
-    #it
-  ]
+  show outline: set heading(outlined: true)
   outline(
     title: box(
       inset: (top: 5em, bottom: 2.8em, left: 0cm, right: 0cm),
       text(size: 25pt)[Table of contents],
     ),
     // indent: i => (0em, 1.5em, 3.6em).at(i),
-    target: selector(heading).or(figure.where(kind: "chapter")),
+    target: selector(heading),
   )
 
   pagebreak()
 }
 
+#let in-outline = state("in-outline", false)
+#let flex-caption(short, caption) = context if state("in-outline", false).get() {
+  short
+} else { caption }
 #let make-list-of-figures() = {
-  box(
-    inset: (top: 7em, bottom: 4em, left: 0cm, right: 0cm),
-    text(size: 1.5em)[= List of figures],
-  )
   let prev-heading-level = state("prev-heading-level", 1)
-  show outline.entry: it => link(
-    it.element.location(),
-    context {
-      let fig = it.element
-      let chapter-number = counter(figure.where(kind: "chapter")).at(fig.location()).first()
-      let fig-number = counter(figure.where(kind: image)).at(fig.location()).first()
-      let number = [#chapter-number.#fig-number]
-      let fill = box(
-        width: 1fr,
-        it.fill,
-      )
-      if prev-heading-level.get() != chapter-number {
-        prev-heading-level.update(chapter-number)
-        v(0.6em)
-      }
-      [#h(2em) #number #h(1em, weak: true) #fig.caption.body #fill #it.page()\ ]
-    },
-  )
+  show outline.entry: it => context {
+    in-outline.update(true)
+    let fig = it.element
+    let chapter-number = counter(heading.where(level: 1)).at(fig.location()).first()
+    let fig-number = counter(figure.where(kind: image)).at(fig.location()).first()
+    let number = [#chapter-number.#fig-number]
+    let fill = box(width: 1fr, it.fill)
+    if prev-heading-level.get() != chapter-number {
+      prev-heading-level.update(chapter-number)
+      v(0.6em)
+    }
+    link(
+      it.element.location(),
+      box(
+        par(hanging-indent: 4.2em, justify: true)[
+          #h(2em) #number #h(1em, weak: true) #fig.caption.body #fill #it.page()
+        ],
+      ),
+    )
+    in-outline.update(false)
+  }
+  show outline: set heading(outlined: true)
   outline(
-    title: none,
+    title: box(inset: (top: 5em, bottom: 2.8em, left: 0cm, right: 0cm), text(size: 25pt)[List of figures]),
     target: figure.where(kind: image),
   )
 
@@ -268,31 +278,30 @@
 }
 
 #let make-list-of-tables() = {
-  box(
-    inset: (top: 7em, bottom: 4em, left: 0cm, right: 0cm),
-    text(size: 1.5em)[= List of tables],
-  )
   let prev-heading-level = state("prev-heading-level", 1)
-  show outline.entry: it => link(
-    it.element.location(),
-    context {
-      let tab = it.element
-      let chapter-number = counter(figure.where(kind: "chapter")).at(tab.location()).first()
-      let tab-number = counter(figure.where(kind: table)).at(tab.location()).first()
-      let number = [#chapter-number.#tab-number]
-      let fill = box(
-        width: 1fr,
-        it.fill,
-      )
-      if prev-heading-level.get() != chapter-number {
-        prev-heading-level.update(chapter-number)
-        v(0.6em)
-      }
-      [#h(2em) #number #h(1em, weak: true) #tab.caption.body #fill #it.page()\ ]
-    },
-  )
+  show outline.entry: it => context {
+    in-outline.update(true)
+    let tab = it.element
+    let chapter-number = counter(heading.where(level: 1)).at(tab.location()).first()
+    let tab-number = counter(figure.where(kind: table)).at(tab.location()).first()
+    let number = [#chapter-number.#tab-number]
+    let fill = box(width: 1fr, it.fill)
+    if prev-heading-level.get() != chapter-number {
+      prev-heading-level.update(chapter-number)
+      v(0.6em)
+    }
+    link(
+      it.element.location(),
+      box(
+        par(hanging-indent: 4.3em, justify: true)[
+          #h(2em) #number #h(1em, weak: true) #tab.caption.body #fill #it.page()],
+      ),
+    )
+    in-outline.update(false)
+  }
+  show outline: set heading(outlined: true)
   outline(
-    title: none,
+    title: box(inset: (top: 5em, bottom: 2.8em, left: 0cm, right: 0cm), text(size: 25pt)[List of tables]),
     target: figure.where(kind: table),
   )
 
